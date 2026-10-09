@@ -97,26 +97,37 @@ function jsonResponse(statusCode, body) {
 }
 
 function gerarCpfValido() {
-  const d = new Array(9);
+  // Gera um CPF válido aleatório
+  let cpf = '';
+  
+  // Gera os primeiros 9 dígitos aleatoriamente
   for (let i = 0; i < 9; i++) {
-    d[i] = Math.floor(Math.random() * 10);
+    cpf += Math.floor(Math.random() * 10);
   }
   
+  // Calcula o primeiro dígito verificador
   let soma = 0;
+  let multiplicador = 10;
   for (let i = 0; i < 9; i++) {
-    soma += d[i] * (10 - i);
+    soma += parseInt(cpf[i]) * multiplicador;
+    multiplicador--;
   }
   let resto = soma % 11;
-  d[9] = resto < 2 ? 0 : 11 - resto;
+  let primeiroDigito = resto < 2 ? 0 : 11 - resto;
   
+  // Calcula o segundo dígito verificador
+  cpf += primeiroDigito;
   soma = 0;
+  multiplicador = 11;
   for (let i = 0; i < 10; i++) {
-    soma += d[i] * (11 - i);
+    soma += parseInt(cpf[i]) * multiplicador;
+    multiplicador--;
   }
   resto = soma % 11;
-  d[10] = resto < 2 ? 0 : 11 - resto;
+  let segundoDigito = resto < 2 ? 0 : 11 - resto;
   
-  return d.join('');
+  cpf += segundoDigito;
+  return cpf;
 }
 
 function fmtPhone(phone) {
@@ -256,12 +267,10 @@ exports.handler = async (event) => {
       });
     }
 
-    // InvictusPay retorna transaction.id (ULID)
-    const transactionId = parsed.transaction?.id || parsed.id || null;
-    
-    // PIX pode estar em: transaction.pix.qr_code ou transaction.pix.brcode
-    const pixCode = parsed.transaction?.pix?.qr_code 
-      || parsed.transaction?.pix?.brcode 
+    // InvictusPay retorna: data.id e data.pix.qr_code
+    const transactionId = parsed.data?.id || parsed.transaction?.id || parsed.id || null;
+    const pixCode = parsed.data?.pix?.qr_code 
+      || parsed.transaction?.pix?.qr_code 
       || parsed.pix?.qr_code 
       || parsed.qr_code 
       || null;
