@@ -1,0 +1,203 @@
+╔════════════════════════════════════════════════════════════════╗
+║     PINGUPAG INTEGRATION - QUICK START GUIDE                  ║
+╚════════════════════════════════════════════════════════════════╝
+
+🎯 OBJETIVO: Integrar gateway Pingupag em 3 passos (5-10 minutos)
+
+═══════════════════════════════════════════════════════════════════
+
+⏱️  TEMPO ESTIMADO: 5-10 minutos
+
+✅ ARQUIVOS JÁ CRIADOS E TESTADOS:
+   - functions/pix-pingupag.js (Gerar PIX)
+   - functions/check-payment-pingupag.js (Verificar status)
+   - functions/webhook-pingupag.js (Receber notificações)
+   - Testes: TODOS PASSARAM ✓
+
+═══════════════════════════════════════════════════════════════════
+
+🚀 PASSO 1: CONFIGURAR NETLIFY (2-3 minutos)
+─────────────────────────────────────────────
+
+1. Abra: https://app.netlify.com
+2. Selecione seu site
+3. Vá em: Settings → Build & Deploy → Environment
+4. Clique: "Add environment variable"
+5. Configure:
+   
+   PINGUPAG_API_KEY
+   │
+   └→ 5a4a884661598e034154315cc12ce8e55ebfd026625c057dcf673b7ca7512384
+
+6. Clique: "Save"
+7. Redeploy manual: Settings → Deploys → Deploy site
+   └→ Aguarde finalizar (esperar ~1 min)
+
+✓ Completo!
+
+═══════════════════════════════════════════════════════════════════
+
+🔔 PASSO 2: CONFIGURAR WEBHOOK PINGUPAG (2-3 minutos)
+────────────────────────────────────────────────────
+
+1. Abra: https://app.pingupag.com
+2. Login com suas credenciais
+3. Vá em: Configurações e API → Webhooks
+4. Clique: "Adicionar Webhook"
+5. Configure:
+
+   Nome: AVENPAY Webhook
+   URL:  https://seu-site.netlify.app/.netlify/functions/webhook-pingupag
+   
+   (Substitua "seu-site" pelo nome real do seu site)
+
+6. Selecione eventos:
+   ✓ Transação Criada
+   ✓ Transação Aprovada
+   ✓ Transação Recusada
+   ✓ Transação Refundada
+
+7. Clique: "Enviar Teste"
+   └→ Resultado esperado: {"success": true, "message": "..."}
+
+✓ Completo!
+
+═══════════════════════════════════════════════════════════════════
+
+📤 PASSO 3: DEPLOY (1-2 minutos)
+────────────────────────────────
+
+Execute estes comandos no terminal:
+
+git add functions/pix-pingupag.js \
+        functions/check-payment-pingupag.js \
+        functions/webhook-pingupag.js \
+        .env.example \
+        PINGUPAG_*.md \
+        test-pingupag.js
+
+git commit -m "🔌 feat: integrate Pingupag gateway
+
+- Add pix-pingupag.js for PIX generation
+- Add check-payment-pingupag.js for status check
+- Add webhook-pingupag.js for payment notifications
+- Includes comprehensive documentation"
+
+git push origin main
+
+✓ Netlify fará deploy automático
+✓ Aguarde ~1-2 minutos
+
+═══════════════════════════════════════════════════════════════════
+
+✨ PRONTO! ENDPOINTS DISPONÍVEIS
+
+POST /.netlify/functions/pix-pingupag
+   Gera PIX/QR Code
+
+GET /.netlify/functions/check-payment-pingupag?id=<transaction_id>
+   Verifica status
+
+POST /.netlify/functions/webhook-pingupag
+   Recebe notificações
+
+═══════════════════════════════════════════════════════════════════
+
+🧪 TESTE RÁPIDO
+
+curl -X POST https://seu-site.netlify.app/.netlify/functions/pix-pingupag \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nome": "Teste Silva",
+    "email": "teste@example.com",
+    "phone": "11999999999",
+    "amount": 10.00
+  }'
+
+Resultado esperado:
+{
+  "success": true,
+  "pixCode": "00020126...",
+  "qr_code_base64": "data:image/png;base64,...",
+  "transaction_id": "PIX...",
+  "status": "pending"
+}
+
+═══════════════════════════════════════════════════════════════════
+
+📚 DOCUMENTAÇÃO COMPLETA
+
+- PINGUPAG_README.md
+  └→ Visão geral e arquitetura
+
+- PINGUPAG_INTEGRATION.md
+  └→ Guia técnico completo com exemplos
+
+- PINGUPAG_DEPLOY_CHECKLIST.md
+  └→ Passo a passo detalhado de deployment
+
+- FRONTEND_INTEGRATION_PINGUPAG.md
+  └→ Exemplos de integração (HTML, React, Vue.js)
+
+═══════════════════════════════════════════════════════════════════
+
+🔐 CREDENCIAIS
+
+API Key: Configure no Netlify (PINGUPAG_API_KEY)
+
+⚠️  IMPORTANTE:
+   - NUNCA compartilhe esta chave
+   - SEMPRE use variáveis de ambiente
+   - NUNCA commit .env com chaves reais
+   - Use .env.example para referência
+
+═══════════════════════════════════════════════════════════════════
+
+🚨 TROUBLESHOOTING RÁPIDO
+
+Problema: "PINGUPAG_API_KEY não configurada"
+Solução: Redeploy no Netlify após adicionar variável
+
+Problema: "Webhook não está sendo disparado"
+Solução: Teste URL no painel Pingupag ("Enviar Teste")
+
+Problema: "Erro 502 ao gerar PIX"
+Solução: Verifique logs Netlify (Functions → Logs)
+
+═══════════════════════════════════════════════════════════════════
+
+✅ CHECKLIST FINAL
+
+[ ] PASSO 1: PINGUPAG_API_KEY adicionada no Netlify
+[ ] PASSO 1: Redeploy realizado
+[ ] PASSO 2: Webhook URL registrada no painel Pingupag
+[ ] PASSO 2: Webhook testado ("Enviar Teste" passou)
+[ ] PASSO 3: Commit e push realizados
+[ ] ✓ Netlify fez deploy automaticamente
+[ ] ✓ Endpoints estão respondendo
+[ ] ✓ Fluxo completo testado
+
+═══════════════════════════════════════════════════════════════════
+
+🎉 PRONTO PARA USAR!
+
+Seu sistema agora suporta:
+✓ Geração de PIX com QR Code
+✓ Verificação de status em tempo real
+✓ Notificações automáticas de pagamento
+✓ Integração com Supabase
+✓ Rastreamento com UTM parameters
+
+═══════════════════════════════════════════════════════════════════
+
+📞 SUPORTE RÁPIDO
+
+Documentação: PINGUPAG_INTEGRATION.md
+Deploy Guide: PINGUPAG_DEPLOY_CHECKLIST.md
+Frontend Docs: FRONTEND_INTEGRATION_PINGUPAG.md
+Testes: test-pingupag.js
+
+═══════════════════════════════════════════════════════════════════
+
+Última atualização: Outubro 2026
+Status: ✅ PRONTO PARA DEPLOY
