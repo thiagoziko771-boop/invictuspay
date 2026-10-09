@@ -172,8 +172,8 @@ exports.handler = async (event) => {
   
   // Calcula o amount baseado na requisição
   // Se vier um valor entre 70-90, é upsell (R$ 81.50)
-  // Padrão é primeira taxa (R$ 65.70)
-  let amountReais = 65.70;
+  // Padrão é primeira taxa (R$ 67.70)
+  let amountReais = 67.70;
   const rawAmount = body.amount ?? body.valor ?? body.total;
   if (rawAmount) {
     const n = Number(rawAmount);
